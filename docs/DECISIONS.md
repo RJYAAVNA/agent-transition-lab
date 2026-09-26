@@ -53,3 +53,58 @@
 - 运行 Uvicorn 时需要使用 `--app-dir src`。
 - 后续 TASK 需要决定 `/research` 是否接入 `OpportunityResearchAgent`。
 - `src/app/tools/__init__.py` 的 legacy dispatcher 命名边界后续需要小步梳理。
+
+## ADR-0003: 新增独立 ResearchAgent 承载最小 Agent Loop
+
+### 日期
+
+2026-09-11
+
+### 决策
+
+在 `src/app/agents/research_agent.py` 新增 `ResearchAgent`，用手写循环实现 LLM Tool Calling / Agent Loop，并通过显式 `tool_registry` 将 `search_web`、`rss_feed` 映射到现有 `SearchTool.search()` 和 `RSSFeedTool.fetch()`。
+
+### 原因
+
+TASK-005 的学习目标是看清 Tool Schema、Tool Call、Tool Execution、Observation 和循环决策的完整链路。独立 Agent Layer 可以保留 Day3 legacy `OpportunityResearchAgent` 和当前 `/research` Service workflow，不用为了教学目标重写已有 API 路径。
+
+### 被放弃方案
+
+- 直接改造 `ResearchService` 为 Agent。
+- 复用 `src/app/tools/__init__.py` 的 legacy mock dispatcher。
+- 引入 LangChain、LangGraph 或其他 Agent Framework。
+
+### 后续影响
+
+- `/research` API 仍然走确定性 `ResearchService`。
+- 后续任务可以在学习者掌握 TASK-005 后，再决定是否把 `ResearchAgent` 接入 API 或继续强化 Agent 状态与异常处理。
+
+## ADR-0004: 抽离轻量 AgentRuntime 和 ToolExecutor
+
+### 日期
+
+2026-09-13
+
+### 决策
+
+在 `src/app/agents/runtime.py` 新增轻量 `AgentRuntime`、`ToolExecutor` 和 execution trace 数据结构。`ResearchAgent` 保留业务职责：prompt、Tool Schema、RSS/Search 工具注册、LLM 调用和最终 `ResearchResponse` 校验；Runtime 负责多步 loop、`max_steps`、Tool Observation 回填、终止条件和 trace。
+
+### 原因
+
+TASK-006 的学习目标是理解 Agent Runtime 的底层机制。将 loop 与业务 Agent 分离后，可以清楚看到：
+
+- 每一次 LLM 请求如何成为一个 step。
+- Runtime 如何限制 `max_steps`。
+- Tool failure 如何转成 observation 返回给模型。
+- Trace 如何记录可观察的 action / observation，而不记录隐藏推理过程。
+
+### 被放弃方案
+
+- 引入 LangChain、LangGraph 或其他 Agent Framework。
+- 继续把 loop、tool dispatch、trace 全部堆在 `ResearchAgent` 一个类里。
+- 将 tool failure 直接抛出并终止 Agent。
+
+### 后续影响
+
+- 后续任务可以在同一个 Runtime 上继续学习 state、evaluation、observability 或再迁移到 LangGraph。
+- `/research` API 当前仍不接入 `ResearchAgent`，避免把 Day06 学习目标扩大成 API 重构。

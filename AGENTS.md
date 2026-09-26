@@ -56,3 +56,11 @@
 - 如果可以基于现有上下文安全推进，则先推进再记录假设。
 - Codex 与 ChatGPT 之间通过 `docs/AI_CONTEXT.md`、`docs/LEARNING_STATE.md` 和 `tasks/` 目录同步上下文。
 
+## Git 分支管理
+
+- `main` 始终保存已完成、测试通过且可继续开发的版本。
+- 每个 TASK 从最新 `main` 创建独立分支，命名为 `feature/TASK-XXX-short-name`。
+- 一个 TASK 跨多天时继续使用同一分支；同一天有多个独立 TASK 时分别创建分支。
+- 任务完成后运行测试、更新文档，通过 Pull Request 检查差异后合入 `main`。
+- 默认使用 Squash Merge，使一个 TASK 在 `main` 上对应一个提交；合入后删除任务分支。
+- 多个 Codex 任务并行开发时，为每个任务使用独立 Git worktree。

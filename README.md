@@ -16,7 +16,7 @@
 
 ## 当前阶段
 
-当前阶段：Day1-Day4 旧项目代码已迁移，正在作为后续学习实践基础。
+当前阶段：Day06 可控 Agent Loop 已完成，项目包含确定性 `/research` workflow、Day3 legacy Agent Loop，以及 Day05/Day06 `ResearchAgent` / `AgentRuntime` 学习入口。
 
 ## 项目结构
 
