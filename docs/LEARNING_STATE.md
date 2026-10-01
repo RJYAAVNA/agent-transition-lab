@@ -15,7 +15,7 @@ Day 7
 - Day06：已完成 `AgentRuntime`、多步 loop、`max_steps`、Tool Error Boundary 和 Execution Trace。
 - Day07：已完成独立 `AgentState`，Runtime 会更新 step、observation、终止状态和 final result。
 - 代码验收和自动化测试已完成。
-- 学习掌握程度仍需以学习者能否独立解释调用链、状态传递、终止条件和设计取舍为准，不能仅凭代码已实现判定。
+- 代码验收和自动化测试已完成；学习复盘证据仍不足以证明已经独立掌握，因此 Day07 暂记为 CONDITIONAL PASS，不自动进入下一 Day。
 
 ## 已有基础
 
@@ -38,6 +38,7 @@ Day 7
 
 - 用自己的话解释 Agent Loop、Action、Observation 和 State。
 - 区分 Message History 与 Agent State：前者是模型上下文，后者是执行进度和结果。
+- 独立说明 `AgentState` 如何由 Runtime 更新，以及它与 Execution Trace 的边界。
 - 区分模型的决策权与 Runtime 的执行控制权。
 - 独立解释 `max_steps` 和其他 termination condition 为什么是安全边界。
 - 区分 Execution Trace、application log 和后续 Observability。
@@ -49,7 +50,7 @@ Day 7
 - `/research` API 仍然使用确定性 `ResearchService`，尚未接入新版 `ResearchAgent` / `AgentRuntime`；这是有意保留的学习边界，不是本轮任务缺陷。
 - `src/app/tools/__init__.py` 的 Day03 legacy dispatcher 与真实 RSS/Search 工具仍同时存在，命名边界需要后续小步梳理。
 - 外部 RSS/Search 请求缺少更完整的集成测试和运行时超时观测。
-- Day06 的 Mandatory Learning Checkpoints 尚未由学习者在文档中填写答案。
+- Day06 的 Mandatory Learning Checkpoints 和 Day07 State Learning Checkpoints 尚未由学习者在文档中填写答案。
 
 ## 学习记录索引
 
@@ -59,11 +60,13 @@ Day 7
 - [Day04 - Layering and Domain Model](../notes/week01/day04.md)
 - [Day05 - Research Agent and Tool Calling](../notes/week01/day05.md)
 - [Day06 - Controllable Agent Loop](../notes/week01/day06.md)
+- [Day07 - Structured Agent State](../notes/week01/day07.md)
 
 历史任务记录：
 
 - [TASK-001](../tasks/TASK-001.md) 到 [TASK-004](../tasks/TASK-004.md) 是根据现有代码和路线补齐的历史任务说明。
 - [TASK-005](../tasks/TASK-005.md) 和 [TASK-006](../tasks/TASK-006.md) 是仓库中已有的实现任务。
+- [TASK-007](../tasks/TASK-007.md) 已完成代码实现和自动化测试。
 
 ## 下一学习目标
 
