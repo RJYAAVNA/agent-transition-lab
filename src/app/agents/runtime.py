@@ -8,6 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from app.agents.state import AgentState, AgentStatus
+
 
 DEFAULT_MAX_STEPS = 5
 
@@ -104,6 +106,7 @@ class AgentRunTrace:
 class AgentRunResult:
     final_result: Any
     trace: AgentRunTrace
+    state: AgentState
 
 
 class ToolExecutor:
@@ -196,106 +199,153 @@ class AgentRuntime:
         self.tool_executor = tool_executor
         self.max_steps = max_steps
         self.last_trace: AgentRunTrace | None = None
+        self.last_state: AgentState | None = None
 
     def run(
         self,
-        messages: list[dict[str, Any]],
-        call_llm: Callable[[list[dict[str, Any]]], Any],
-        parse_final_response: Callable[[str], Any],
+        messages: list[dict[str, Any]] | AgentState | None = None,
+        call_llm: Callable[[list[dict[str, Any]]], Any] | None = None,
+        parse_final_response: Callable[[str], Any] | None = None,
+        *,
+        state: AgentState | None = None,
     ) -> AgentRunResult:
+        if isinstance(messages, AgentState):
+            if state is not None:
+                raise ValueError("Provide AgentState either positionally or by keyword.")
+            state = messages
+            messages = None
+
+        if call_llm is None or parse_final_response is None:
+            raise ValueError("call_llm and parse_final_response are required.")
+
+        if state is None:
+            if messages is None:
+                raise ValueError("messages or state is required.")
+            state = AgentState(goal="", messages=messages)
+        elif messages is not None and not state.messages:
+            state.messages = messages
+
+        self.last_state = state
+        state.status = AgentStatus.RUNNING
+        state.current_step = 0
+        state.final_result = None
         trace = AgentRunTrace()
 
-        for step in range(1, self.max_steps + 1):
-            started_at = perf_counter()
+        try:
+            for step in range(1, self.max_steps + 1):
+                state.current_step = step
+                started_at = perf_counter()
 
-            # 1. Ask the LLM what to do next.
-            response = call_llm(messages)
-            message = self._extract_message(response)
+                # 1. Ask the LLM what to do next.
+                response = call_llm(state.messages)
+                message = self._extract_message(response)
 
-            # 2. Inspect requested tool calls.
-            tool_calls = getattr(message, "tool_calls", None)
-            if not tool_calls:
-                final_content = getattr(message, "content", None) or ""
-                try:
-                    final_result = parse_final_response(final_content)
-                except AgentResponseError:
+                # 2. Inspect requested tool calls.
+                tool_calls = getattr(message, "tool_calls", None)
+                if not tool_calls:
+                    final_content = getattr(message, "content", None) or ""
+                    try:
+                        final_result = parse_final_response(final_content)
+                    except AgentResponseError:
+                        trace.steps.append(
+                            AgentStepTrace(
+                                step=step,
+                                tool_calls=[],
+                                tool_results=[],
+                                status="invalid_output",
+                                duration_ms=self._elapsed_ms(started_at),
+                            )
+                        )
+                        trace.total_steps = step
+                        trace.stop_reason = "invalid_output"
+                        self.last_trace = trace
+                        raise
+
+                    state.status = AgentStatus.COMPLETED
+                    state.final_result = final_result
                     trace.steps.append(
                         AgentStepTrace(
                             step=step,
                             tool_calls=[],
                             tool_results=[],
-                            status="invalid_output",
+                            status="completed",
                             duration_ms=self._elapsed_ms(started_at),
                         )
                     )
                     trace.total_steps = step
-                    trace.stop_reason = "invalid_output"
+                    trace.stop_reason = "completed"
                     self.last_trace = trace
-                    raise
-
-                trace.steps.append(
-                    AgentStepTrace(
-                        step=step,
-                        tool_calls=[],
-                        tool_results=[],
-                        status="completed",
-                        duration_ms=self._elapsed_ms(started_at),
+                    return AgentRunResult(
+                        final_result=final_result,
+                        trace=trace,
+                        state=state,
                     )
+
+                state.messages.append(self._assistant_message_with_tool_calls(message))
+
+                step_trace = AgentStepTrace(
+                    step=step,
+                    tool_calls=[],
+                    tool_results=[],
+                    status="tool_called",
+                    duration_ms=0.0,
                 )
-                trace.total_steps = step
-                trace.stop_reason = "completed"
-                self.last_trace = trace
-                return AgentRunResult(final_result=final_result, trace=trace)
 
-            messages.append(self._assistant_message_with_tool_calls(message))
+                # 3. Execute all tools requested by the model, sequentially.
+                for tool_call in tool_calls:
+                    tool_name, raw_arguments, tool_call_id = self._extract_tool_call(tool_call)
+                    observation = self.tool_executor.execute_tool(tool_name, raw_arguments)
+                    state.observations.append(observation)
+                    serialized_observation = observation.to_message_content()
 
-            step_trace = AgentStepTrace(
-                step=step,
-                tool_calls=[],
-                tool_results=[],
-                status="tool_called",
-                duration_ms=0.0,
+                    step_trace.tool_calls.append(tool_name)
+                    step_trace.tool_results.append(serialized_observation)
+                    step_trace.calls.append(
+                        ToolCallTrace(
+                            tool=tool_name,
+                            arguments=observation.arguments,
+                            ok=observation.ok,
+                            error=observation.error,
+                        )
+                    )
+
+                    # 4. Append the observable tool result to the LLM context.
+                    state.messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call_id,
+                            "content": serialized_observation,
+                        }
+                    )
+
+                step_trace.duration_ms = self._elapsed_ms(started_at)
+                trace.steps.append(step_trace)
+
+                # 5. Continue the loop so the LLM can decide again.
+
+            state.status = AgentStatus.MAX_STEPS
+            state.final_result = None
+            trace.total_steps = self.max_steps
+            trace.stop_reason = "max_steps"
+            self.last_trace = trace
+            raise AgentMaxStepsExceeded(
+                "Agent reached max_steps="
+                f"{self.max_steps}; executed_steps={trace.total_steps}; "
+                f"last_status={trace.last_status_summary()}"
             )
-
-            # 3. Execute all tools requested by the model, sequentially.
-            for tool_call in tool_calls:
-                tool_name, raw_arguments, tool_call_id = self._extract_tool_call(tool_call)
-                observation = self.tool_executor.execute_tool(tool_name, raw_arguments)
-                serialized_observation = observation.to_message_content()
-
-                step_trace.tool_calls.append(tool_name)
-                step_trace.tool_results.append(serialized_observation)
-                step_trace.calls.append(
-                    ToolCallTrace(
-                        tool=tool_name,
-                        arguments=observation.arguments,
-                        ok=observation.ok,
-                        error=observation.error,
-                    )
-                )
-
-                # 4. Append the observable tool result to the LLM context.
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call_id,
-                        "content": serialized_observation,
-                    }
-                )
-
-            step_trace.duration_ms = self._elapsed_ms(started_at)
-            trace.steps.append(step_trace)
-
-            # 5. Continue the loop so the LLM can decide again.
-
-        trace.total_steps = self.max_steps
-        trace.stop_reason = "max_steps"
-        self.last_trace = trace
-        raise AgentMaxStepsExceeded(
-            "Agent reached max_steps="
-            f"{self.max_steps}; executed_steps={trace.total_steps}; "
-            f"last_status={trace.last_status_summary()}"
-        )
+        except AgentMaxStepsExceeded:
+            state.status = AgentStatus.MAX_STEPS
+            state.final_result = None
+            self.last_trace = trace
+            self.last_state = state
+            raise
+        except Exception:
+            state.status = AgentStatus.ERROR
+            state.final_result = None
+            trace.total_steps = len(trace.steps)
+            self.last_trace = trace
+            self.last_state = state
+            raise
 
     @staticmethod
     def _extract_message(response: Any) -> Any:

@@ -1078,26 +1078,28 @@ Day 1
 Day 2
 Day 3
 Day 4
+Day 5
+Day 6
 ```
 
-目前进入：
+当前停在：
 
 ```text
-Day 5 — Research Workflow
+Day 6 — Controllable Agent Loop
 ```
 
 当前重点：
 
 ```text
-Input
+Loop
  ↓
-Plan
+State
  ↓
-Tool
+Runtime Control
  ↓
-Analyze
+Termination
  ↓
-Output
+Execution Trace
 ```
 
 现阶段继续坚持：

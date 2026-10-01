@@ -21,8 +21,9 @@
 | `src/app/main.py` | FastAPI 应用创建和 Uvicorn 本地启动入口 |
 | `src/app/api/research.py` | `/research` HTTP API 路由和异常到 HTTP 状态码的转换 |
 | `src/app/services/research_service.py` | 编排 RSS/Search 工具，完成 `RSSItem`、`SearchResult` 到 `Evidence` 的转换 |
-| `src/app/agents/research_agent.py` | Day05/Day06 业务 Agent，负责 prompt、Tool Schema、RSS/Search 工具注册、LLM 调用和最终结构化输出校验 |
-| `src/app/agents/runtime.py` | Day06 轻量 Agent Runtime，负责多步 loop、`max_steps`、ToolExecutor、Tool Error Boundary 和 Execution Trace |
+| `src/app/agents/research_agent.py` | Day05-Day07 业务 Agent，负责 prompt、Tool Schema、RSS/Search 工具注册、LLM 调用、State 创建和最终结构化输出校验 |
+| `src/app/agents/state.py` | `AgentState` 和 `AgentStatus`，保存一次 Agent 运行的可观察执行状态 |
+| `src/app/agents/runtime.py` | Day06-Day07 轻量 Agent Runtime，负责多步 loop、State 更新、`max_steps`、ToolExecutor、Tool Error Boundary 和 Execution Trace |
 | `src/app/tools/rss_tool.py` | 请求并解析 RSS/Atom feed，输出 `RSSItem` |
 | `src/app/tools/search_tool.py` | 请求并解析 Search API，输出 `SearchResult` |
 | `src/app/tools/__init__.py` | Day3 legacy Agent tool dispatcher 和 mock `search_web` tool |
@@ -55,16 +56,21 @@
 
 ```text
 调用 ResearchAgent.research(goal)
-  -> AgentRuntime.run()
+  -> 创建 AgentState(status=pending, current_step=0)
+  -> AgentRuntime.run(state)
+  -> State.status=running
   -> LLM chat.completions.create()
   -> LLM 根据 Tool Schema 选择 search_web 或 rss_feed
   -> ToolExecutor registry
   -> 解析并校验 tool_call.function.arguments
   -> SearchTool.search(query) 或 RSSFeedTool.fetch()
   -> Tool Result 或 Tool Error 序列化为 ok=true/ok=false Observation JSON
-  -> append 到 messages
+  -> Observation 写入 AgentState.observations
+  -> append 到 AgentState.messages
   -> LLM 读取 tool observation 并继续决策，直到 final answer 或 max_steps
   -> final JSON 通过 Pydantic 校验
+  -> ResearchResponse 写入 AgentState.final_result
+  -> AgentState.status=completed，或 max_steps/error
   -> ResearchResponse，并可通过 trace 查看执行轨迹
 ```
 
@@ -78,6 +84,16 @@ ResearchRequest.topic
     -> RSSItem / SearchResult
     -> Evidence
     -> ResearchResponse
+```
+
+Agent 执行状态数据流：
+
+```text
+goal
+  -> AgentState
+  -> AgentRuntime 更新 current_step
+  -> ToolObservation 写入 observations
+  -> final/max_steps/error 更新 status 和 final_result
 ```
 
 ## 外部系统
@@ -106,6 +122,7 @@ flowchart TD
     LLM[OpenAI-compatible LLM]
     Dispatcher[Tool Dispatcher]
     MockTool[search_web mock tool]
+    State[AgentState]
 
     User --> FastAPI
     FastAPI --> API
@@ -126,6 +143,8 @@ flowchart TD
     MockTool --> LegacyAgent
 
     ResearchAgent --> Runtime
+    ResearchAgent --> State
+    State --> Runtime
     Runtime --> LLM
     LLM --> Runtime
     Runtime --> Executor
@@ -138,7 +157,8 @@ flowchart TD
 
 - `ResearchService` 是当前 `/research` 的业务入口，负责从工具结果构造 Agent 领域响应。
 - `RSSFeedTool` 和 `SearchTool` 当前更接近外部数据源 client/tool 混合体，尚未进一步拆分。
-- `ResearchAgent` 是 Day05/Day06 的 Agent 学习入口，负责业务 prompt、Tool Schema、真实工具注册和最终 `ResearchResponse` 校验；当前未接入 HTTP API。
-- `AgentRuntime` 负责通用 loop、step、tool observation 回填、`max_steps` 终止和 trace，不包含 Opportunity Research 业务规则。
+- `ResearchAgent` 是 Day05-Day07 的 Agent 学习入口，负责业务 prompt、Tool Schema、真实工具注册、创建 State 和最终 `ResearchResponse` 校验；当前未接入 HTTP API。
+- `AgentState` 表示可观察、可测试、可恢复的单次执行状态，不包含 hidden Chain-of-Thought、Secret、Tool 实例或数据库连接。
+- `AgentRuntime` 负责通用 loop、State 的 step/status/result 更新、tool observation 回填、`max_steps` 终止和 trace，不包含 Opportunity Research 业务规则。
 - `ToolExecutor` 负责 Tool Registry、参数解析、工具执行和错误 observation，避免 Agent 主循环直接了解每个工具实现。
 - `OpportunityResearchAgent` 保留 Day3 legacy Tool Calling 学习调用链。

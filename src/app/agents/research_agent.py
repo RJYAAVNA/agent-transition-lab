@@ -19,6 +19,7 @@ from app.agents.runtime import (
     ToolExecutor,
     ToolSpec,
 )
+from app.agents.state import AgentState
 from app.core.config import settings
 from app.schemas.research import ResearchResponse
 from app.tools.rss_tool import RSSFeedTool
@@ -140,6 +141,7 @@ class ResearchAgent:
             max_steps=self.max_steps,
         )
         self.last_trace: AgentRunTrace | None = None
+        self.last_state: AgentState | None = None
 
         if client is not None:
             self.client = client
@@ -154,19 +156,23 @@ class ResearchAgent:
         return result.final_result
 
     def research_with_trace(self, goal: str) -> AgentRunResult:
-        messages: list[dict[str, Any]] = [
-            {"role": "system", "content": self._system_prompt()},
-            {"role": "user", "content": f"Research goal: {goal}"},
-        ]
+        state = AgentState(
+            goal=goal,
+            messages=[
+                {"role": "system", "content": self._system_prompt()},
+                {"role": "user", "content": f"Research goal: {goal}"},
+            ],
+        )
 
         try:
             result = self.runtime.run(
-                messages=messages,
                 call_llm=self._call_llm,
                 parse_final_response=self._parse_final_response,
+                state=state,
             )
         finally:
             self.last_trace = self.runtime.last_trace
+            self.last_state = self.runtime.last_state
 
         return result
 
