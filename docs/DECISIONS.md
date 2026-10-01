@@ -108,3 +108,37 @@ TASK-006 的学习目标是理解 Agent Runtime 的底层机制。将 loop 与�
 
 - 后续任务可以在同一个 Runtime 上继续学习 state、evaluation、observability 或再迁移到 LangGraph。
 - `/research` API 当前仍不接入 `ResearchAgent`，避免把 Day06 学习目标扩大成 API 重构。
+
+## ADR-0005: 使用最小显式 AgentState 驱动 Runtime
+
+### 日期
+
+2026-10-01
+
+### 决策
+
+新增 `src/app/agents/state.py`，使用 dataclass 定义 `AgentState` 和 `AgentStatus`。一次运行的 State 保存 `goal`、`messages`、`current_step`、`observations`、`status` 和 `final_result`。`ResearchAgent` 创建 State，`AgentRuntime` 负责在每个 step、工具 observation、正常完成、max steps 和异常路径更新 State。
+
+`AgentRunResult` 同时返回 `final_result`、`trace` 和 `state`；旧的 `AgentRuntime.run(messages, ...)` 形式仍可用，兼容已有调用方式。
+
+### 原因
+
+Day06 中执行上下文主要分散在 messages、循环变量和 trace。显式 State 可以清楚区分：
+
+- `messages`：LLM 看到的上下文。
+- `AgentState`：Agent 执行到哪里、获得了什么、当前状态和最终结果。
+- `trace`：面向诊断的执行轨迹。
+
+选择 dataclass 是因为当前 Runtime 和 trace 已使用 dataclass，State 只需要轻量的内存模型，不需要额外的持久化或序列化框架。
+
+### 被放弃方案
+
+- 继续只使用 messages 和局部变量。
+- 将 Tool 实例、LLM Client、API Key 或隐藏推理过程放进 State。
+- 为当前学习目标引入 LangGraph、数据库或 checkpoint persistence。
+
+### 后续影响
+
+- `ResearchAgent` 现在可以通过 `last_state` 观察最近一次运行。
+- 运行失败时 State 会保留已执行部分，并标记为 `error`；达到限制时标记为 `max_steps`。
+- `/research` API 仍然保留确定性 `ResearchService`，不在本 TASK 接入 Agent Runtime。
