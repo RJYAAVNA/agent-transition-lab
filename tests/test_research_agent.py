@@ -161,6 +161,62 @@ def test_agent_executes_rss_tool_call() -> None:
     assert run.trace.steps[0].tool_calls == ["rss_feed"]
 
 
+def test_different_goals_follow_the_tool_calls_returned_by_the_llm() -> None:
+    search_agent = _agent(
+        [
+            _response(_message(tool_calls=[_tool_call("search_web", '{"query": "latest agent news"}') ])),
+            _response(_message(content=FINAL_JSON)),
+        ]
+    )
+    rss_agent = _agent(
+        [
+            _response(_message(tool_calls=[_tool_call("rss_feed")])),
+            _response(_message(content=FINAL_JSON)),
+        ]
+    )
+
+    search_run = search_agent.research_with_trace("Find current AI agent information")
+    rss_run = rss_agent.research_with_trace("Check recent items in my configured feed")
+
+    assert search_run.trace.steps[0].tool_calls == ["search_web"]
+    assert search_run.state.observations[0].tool == "search_web"
+    assert rss_run.trace.steps[0].tool_calls == ["rss_feed"]
+    assert rss_run.state.observations[0].tool == "rss_feed"
+    assert search_agent.client.chat.completions.calls[0]["tools"] == rss_agent.client.chat.completions.calls[0]["tools"]
+
+
+def test_agent_selects_different_tools_across_steps_and_records_state_and_trace() -> None:
+    search_tool = FakeSearchTool()
+    rss_tool = FakeRSSTool()
+    agent = _agent(
+        [
+            _response(_message(tool_calls=[_tool_call("search_web", '{"query": "agent tooling"}') ])),
+            _response(_message(tool_calls=[_tool_call("rss_feed")])),
+            _response(_message(content=FINAL_JSON)),
+        ],
+        search_tool=search_tool,
+        rss_tool=rss_tool,
+    )
+
+    run = agent.research_with_trace("Research recent agent tooling developments")
+
+    assert search_tool.queries == ["agent tooling"]
+    assert rss_tool.fetch_count == 1
+    assert run.state.current_step == 3
+    assert run.state.status.value == "completed"
+    assert [observation.tool for observation in run.state.observations] == [
+        "search_web",
+        "rss_feed",
+    ]
+    assert [step.tool_calls for step in run.trace.steps] == [
+        ["search_web"],
+        ["rss_feed"],
+        [],
+    ]
+    assert run.trace.total_steps == 3
+    assert run.trace.stop_reason == "completed"
+
+
 def test_agent_appends_tool_observation_to_messages() -> None:
     agent = _agent(
         [
@@ -268,6 +324,8 @@ def test_agent_turns_unknown_tool_into_observation() -> None:
 
     assert run.trace.steps[0].tool_calls == ["unknown_tool"]
     assert run.trace.steps[0].calls[0].ok is False
+    assert run.state.observations[0].tool == "unknown_tool"
+    assert run.state.observations[0].error is not None
     second_call_messages = agent.client.chat.completions.calls[1]["messages"]
     tool_messages = [
         message for message in second_call_messages if message["role"] == "tool"
@@ -286,11 +344,37 @@ def test_agent_turns_invalid_tool_arguments_into_observation() -> None:
     run = agent.research_with_trace("AI Agent engineering")
 
     assert run.trace.steps[0].calls[0].ok is False
+    assert run.state.observations[0].ok is False
     second_call_messages = agent.client.chat.completions.calls[1]["messages"]
     tool_messages = [
         message for message in second_call_messages if message["role"] == "tool"
     ]
     assert "invalid JSON arguments" in tool_messages[0]["content"]
+
+
+def test_agent_turns_schema_invalid_arguments_into_observation() -> None:
+    agent = _agent(
+        [
+            _response(
+                _message(
+                    tool_calls=[
+                        _tool_call("search_web", '{"wrong_field": "agent loop"}')
+                    ]
+                )
+            ),
+            _response(_message(content=FINAL_JSON)),
+        ]
+    )
+
+    run = agent.research_with_trace("Search for agent loop information")
+
+    assert run.state.observations[0].ok is False
+    assert "do not match its schema" in (run.state.observations[0].error or "")
+    assert run.trace.steps[0].calls[0].ok is False
+    second_call_messages = agent.client.chat.completions.calls[1]["messages"]
+    assert '"ok": false' in next(
+        message["content"] for message in second_call_messages if message["role"] == "tool"
+    )
 
 
 def test_agent_stops_at_max_iterations() -> None:

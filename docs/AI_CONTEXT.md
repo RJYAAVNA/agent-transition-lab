@@ -90,6 +90,8 @@ goal
 
 ## Recent Structural Changes
 
+- 2026-10-01：完成 TASK-008，确认 Tool Selection 由 LLM 返回的 Tool Call 驱动；Runtime/ToolExecutor 保持验证、执行和循环控制边界，并补充 search/rss、多步、无工具及错误 observation 测试。
+
 - 2026-10-01：完成 TASK-007，新增 `AgentState`，将 step、observation、终止状态和最终结果接入 `AgentRuntime`。
 - 2026-09-26：采用 `main` + 短期 TASK 分支流程；任务分支从最新 `main` 创建，完成并测试后通过 PR 合入。
 - TASK-005/006：新增独立 `ResearchAgent`，并抽离 `AgentRuntime` / `ToolExecutor`，实现真实工具调用、多步循环、`max_steps`、错误 observation 和 execution trace。
@@ -105,8 +107,8 @@ goal
 
 ## Current Task
 
-TASK-007 已完成：新增显式 `AgentState`，并通过测试验证 initial、单工具、多步、completed、max_steps 和 error 状态。本轮没有接入 `/research` API，也没有启动 TASK-008。
+TASK-008 已完成：Tool Schema 提供可用能力，LLM 通过 Tool Call 选择 `search_web` 或 `rss_feed`；Runtime/ToolExecutor 负责未知工具、非法 JSON、参数 schema、执行错误的受控 observation，并继续驱动 AgentState、ExecutionTrace 和多步循环。本轮没有接入 `/research` API，也没有启动 TASK-009。
 
 ## Next Recommended Step
 
-先完成 Day07 学习验收，能够用自己的话解释 Message History、AgentState、Runtime Control 和 State 更新顺序。最终学习顺序仍由 `LEARNING_ROADMAP.md` 和 ChatGPT 的学习验收决定。
+完成 Day08 学习验收，能够用自己的话解释 Tool Schema、LLM Tool Selection、Decision vs Execution 和 Argument Validation。最终学习顺序仍由 `LEARNING_ROADMAP.md` 和 ChatGPT 的学习验收决定。

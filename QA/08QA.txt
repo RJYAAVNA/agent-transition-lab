@@ -1,0 +1,17 @@
+Q1. 为什么说 LLM 有 Tool Selection 权限，但没有 Tool Execution 权限？
+LLM只有选择权，真实tool的调用需要runtime去执行，同时也需要runtime进行执行控制
+Q2. Tool Calling 和普通 Function Calling 有什么本质区别？
+Tool calling中间包含observation以及agentState等一系列内容，而function calling只是单纯的方法调用
+Q3. 为什么 Tool Description 会影响 LLM 的 Tool Selection？
+这个猜测是和tool_choice="auto"有关，不过未看到具体的代码实现
+Q4. Design A 的关键词判断与 Design B 的 LLM Tool Call 有什么区别？
+这个没看懂什么意思
+Q5. 非法 Tool 参数应该由谁发现？为什么？
+非法的tool参数应由runtime在交由llm执行前进行校验处理，runtime负责执行控制，llm负责决策调用什么
+Q6. 为什么 Runtime 不能完全相信 LLM 返回的 Tool Call？
+runtime要做好执行控制，对于LLM返回的tool call也需要教研
+Q7. Day07 的 AgentState 和 Day08 的 Tool Selection 是什么关系？
+有约定好的agentState，LLM才好根据其中的status以及step等内容进行tool selection
+Q8. 请完整解释从 User Goal 到 Observation、AgentState 再回到 LLM 的执行链路。
+user goal提交至runtime，runtime封装参数，包括初始化agentState然后传给LLM，LLM决策使用哪个tool，然后调用，tool返回的结果会放到observation中，再次返回给LLM决策，
+等全部tool执行完或者超过最大调用次数，视为处理结束，这个时候再返回给runtime

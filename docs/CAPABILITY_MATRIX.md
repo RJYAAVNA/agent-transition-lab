@@ -15,9 +15,9 @@
 | LLM Fundamentals | 学习中 | 已有 OpenAI-compatible chat completions 调用链实践 |
 | Prompt Engineering | 学习中 | 已有 Agent system prompt 和最终 JSON 输出要求 |
 | Structured Output | 学习中 | 已有 Pydantic schema 与 LLM final JSON 校验实践 |
-| Tool Calling | 学习中 | 已有 Tool Schema、tool_calls、dispatcher、参数校验和 observation 回填实践 |
-| Agent Loop | 学习中 | 已有多步 loop、Action/Observation、tool result 回传和 termination 实践；独立解释与排障能力待验收 |
-| Agent Runtime | 学习中 | 已有 `AgentRuntime`、`ToolExecutor`、显式 `AgentState`、`max_steps`、Tool Error Boundary 和 execution trace 实践；代码已通过测试，但学习者独立设计与排障尚无证据 |
+| Tool Calling | 学习中 | 已能解释 LLM Tool Selection、Runtime 校验执行和 Observation 回填；Tool Schema 对选择的影响、普通 Function Calling 的协议差异仍需强化 |
+| Agent Loop | 学习中 | 已能说明 LLM 决策到 Observation 回传的主链路；终止条件和决策责任边界仍需独立强化 |
+| Agent Runtime | 学习中 | 已能说明 Runtime/ToolExecutor 的验证、执行、状态更新和终止边界；独立设计与排障尚无充分证据 |
 | RAG | 未学习 | 待学习知识库问答基本架构 |
 | Embedding | 未学习 | 待学习向量表示与模型选择 |
 | Retrieval | 学习中 | 已有 RSS/Search 结果到 Evidence 的筛选与转换，但尚未学习向量检索 |
