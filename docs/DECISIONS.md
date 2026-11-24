@@ -142,3 +142,7 @@ Day06 中执行上下文主要分散在 messages、循环变量和 trace。显�
 - `ResearchAgent` 现在可以通过 `last_state` 观察最近一次运行。
 - 运行失败时 State 会保留已执行部分，并标记为 `error`；达到限制时标记为 `max_steps`。
 - `/research` API 仍然保留确定性 `ResearchService`，不在本 TASK 接入 Agent Runtime。
+
+## TASK-010 云端开发依赖与测试边界
+
+2026-11-24。Linux 和 Windows 共用 `uv.lock`。默认 pytest 套件用替身覆盖外部调用，安装完成后可断网执行。PostgreSQL 初始化、SQL 迁移和固定种子数据作为独立的测试环境示例，应用继续在内存中维护 AgentState。

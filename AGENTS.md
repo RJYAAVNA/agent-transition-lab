@@ -15,6 +15,18 @@
 - `docs/ARCHITECTURE.md`
 - `docs/DECISIONS.md`
 
+## 项目结构和命令
+
+- `src/app/` 包含 FastAPI、研究服务、Agent Runtime、配置与 RSS/Search 工具。
+- `tests/` 包含离线测试。LLM 使用注入的假客户端，RSS/Search 使用固定数据或请求替身。
+- `scripts/` 提供 Linux 和 Codex Cloud 安装及测试入口。
+- `tasks/` 存放任务范围与验收条件。`docs/` 存放项目上下文、架构和学习状态，`notes/` 存放学习记录。
+- Linux/Codex Cloud 安装用 `bash scripts/codex-setup.sh`，测试用 `bash scripts/codex-test.sh`，可追加 pytest 参数。
+- Windows PowerShell 安装用 `py -m uv sync --locked --dev`，测试用 `py -m uv run --locked pytest`。
+- 启动 API 用 `uv run --locked uvicorn --app-dir src app.main:app --host 127.0.0.1 --port 8765`，Windows 可将 `uv` 换成 `py -m uv`。
+- 默认测试使用 Python 3.11+ 和 `uv.lock`，无需数据库、真实凭证或外部 API。云端配置见 [CODEX_CLOUD_SETUP.md](docs/CODEX_CLOUD_SETUP.md)。
+- 提交配置示例时使用空值和公开默认值。真实凭证只通过本地忽略文件或云端凭证配置提供。
+
 ## 开发原则
 
 - 禁止为了完成当前任务进行无关重构。
@@ -64,3 +76,5 @@
 - 任务完成后运行测试、更新文档，通过 Pull Request 检查差异后合入 `main`。
 - 默认使用 Squash Merge，使一个 TASK 在 `main` 上对应一个提交；合入后删除任务分支。
 - 多个 Codex 任务并行开发时，为每个任务使用独立 Git worktree。
+- 保留其他任务的未提交改动，先确认当前分支和工作区。云端从 GitHub 可见的目标分支继续，本地未推送的提交和未提交文件不会同步。
+- 检查差异与测试结果后交由用户决定提交、推送和合并。本任务禁止自动推送或合并到 `main`。

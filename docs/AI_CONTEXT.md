@@ -90,22 +90,24 @@ goal
 
 ## Recent Structural Changes
 
+- 2026-11-24：TASK-010 增加基于 `uv.lock` 的 Cloud 安装/离线测试脚本、根目录 `.env` 支持与迁移教程。PostgreSQL 示例独立于应用运行。
+
 - 2026-10-01：完成 TASK-008，确认 Tool Selection 由 LLM 返回的 Tool Call 驱动；Runtime/ToolExecutor 保持验证、执行和循环控制边界，并补充 search/rss、多步、无工具及错误 observation 测试。
 
 - 2026-10-01：完成 TASK-007，新增 `AgentState`，将 step、observation、终止状态和最终结果接入 `AgentRuntime`。
 - 2026-09-26：采用 `main` + 短期 TASK 分支流程；任务分支从最新 `main` 创建，完成并测试后通过 PR 合入。
 - TASK-005/006：新增独立 `ResearchAgent`，并抽离 `AgentRuntime` / `ToolExecutor`，实现真实工具调用、多步循环、`max_steps`、错误 observation 和 execution trace。
-- 2026-09-10：Day01-Day04 代码迁移到 `src/app/`，测试迁移到 `tests/`。
-- 2026-09-10：建立长期文档、任务目录和学习上下文同步入口。
 
 ## Known Issues
 
 - Runtime 异常会把 State 标记为 `error` 并保存已有的部分 trace；异常发生前没有完成的 step 可能没有单独的 error trace 节点。
 - Trace 当前保存工具参数、完整 observation 和异常文本，没有脱敏处理。
-- 配置加载路径实际为 `src/.env`，不会自动读取仓库根目录 `.env`；根目录仅提供 `.env.example`。
+- 配置优先级为进程环境变量、根目录 `.env`、旧版 `src/.env`。
 - RSS/Search HTTP 请求层缺少更完整的集成测试和超时观测；Agent 测试使用替身，不验证真实外部服务连通性。
 
 ## Current Task
+
+开发环境维护见 [TASK-010](../tasks/TASK-010.md)。GitHub 授权、发布 Cloud 环境及手机端实测见 [云端配置教程](CODEX_CLOUD_SETUP.md)。
 
 TASK-008 已完成：Tool Schema 提供可用能力，LLM 通过 Tool Call 选择 `search_web` 或 `rss_feed`；Runtime/ToolExecutor 负责未知工具、非法 JSON、参数 schema、执行错误的受控 observation，并继续驱动 AgentState、ExecutionTrace 和多步循环。本轮没有接入 `/research` API，也没有启动 TASK-009。
 

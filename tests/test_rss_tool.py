@@ -1,7 +1,10 @@
 from datetime import UTC, datetime
+from io import BytesIO
+from urllib.request import Request
 
 import pytest
 
+from app.tools import rss_tool
 from app.tools.rss_tool import RSSFeedTool, RSSParseError
 
 
@@ -42,3 +45,25 @@ def test_rss_tool_rejects_empty_feed() -> None:
 
     with pytest.raises(RSSParseError):
         tool.parse(b"<rss><channel><title>Empty</title></channel></rss>")
+
+
+def test_fetch_requests_configured_feed(monkeypatch: pytest.MonkeyPatch) -> None:
+    tool = RSSFeedTool(
+        feed_url="https://example.com/feed.xml",
+        source_name="Test feed",
+        timeout_seconds=3,
+    )
+
+    class FakeResponse(BytesIO):
+        def getcode(self) -> int:
+            return 200
+
+    def fake_urlopen(request: Request, *, timeout: float) -> FakeResponse:
+        assert request.full_url == "https://example.com/feed.xml"
+        assert request.get_header("User-agent") == "ExampleAgent"
+        assert timeout == 3
+        return FakeResponse(SAMPLE_FEED)
+
+    monkeypatch.setattr(rss_tool.settings, "rss_user_agent", "ExampleAgent")
+    monkeypatch.setattr(rss_tool, "urlopen", fake_urlopen)
+    assert tool.fetch()[0].source == "Test feed"

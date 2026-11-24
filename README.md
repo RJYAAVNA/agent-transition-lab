@@ -45,13 +45,13 @@ agent-transition-lab/
 安装依赖：
 
 ```powershell
-py -m uv sync --dev
+py -m uv sync --locked --dev
 ```
 
 运行测试：
 
 ```powershell
-py -m uv run pytest
+py -m uv run --locked pytest
 ```
 
 启动 FastAPI 服务：
@@ -69,6 +69,7 @@ http://127.0.0.1:8000/docs
 ## 文档入口
 
 - [AGENTS.md](AGENTS.md)：Codex 后续开发规则
+- [docs/CODEX_CLOUD_SETUP.md](docs/CODEX_CLOUD_SETUP.md)：Linux 安装、云端配置、迁移检查和手机端接续
 - [docs/AI_CONTEXT.md](docs/AI_CONTEXT.md)：当前有效上下文
 - [docs/LEARNING_STATE.md](docs/LEARNING_STATE.md)：学习状态
 - [docs/CAPABILITY_MATRIX.md](docs/CAPABILITY_MATRIX.md)：Agent Engineer 能力矩阵
